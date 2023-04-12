@@ -13,6 +13,18 @@ import com.google.gson.*;
 //concurrent hashmap import 
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload;
+import java.security.GeneralSecurityException;
+import java.util.UUID;
+
+//This is all extra imports for the google authentication 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.jackson2.JacksonFactory;
+
 
 
 /**
@@ -107,6 +119,14 @@ public class App {
      * @param args Command-line arguments.  We ignore these.
      */
     public static void main(String[] args) {
+
+        // Replace "YOUR_CLIENT_ID" with your actual Google client ID
+        String clientId = "http://cse216-teamtoo-app.dokku.cse.lehigh.edu";
+        JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
+        GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), jsonFactory)
+        .setAudience(Collections.singletonList(clientId))
+        .build();
+
         // Get the port on which to listen for requests
         Spark.port(getIntFromEnv("PORT", DEFAULT_PORT_SPARK));
 
@@ -282,15 +302,22 @@ public class App {
         //Google authentication function 
         Spark.post("/auth", (request, response) -> {
             response.type("application/json");
-            SimpleRequest req = gson.fromJson(request.body(), SimpleRequest.class);
+
+            // Extract the ID token from the Authorization header
+            String authHeader = request.headers("Authorization");
+            String[] authHeaderParts = authHeader.split(" ");
+            String idTokenString = authHeaderParts[1];
+
             try {
-                Payload payload = GoogleAuth.verifyToken(req.idToken);
-                if (payload != null) {
+                // Verify the ID token
+                GoogleIdToken idToken = verifier.verify(idTokenString);
+                if (idToken != null) {
+                    Payload payload = idToken.getPayload();
                     String userEmail = payload.getEmail();
                     if (userEmail != null && userEmail.endsWith("@lehigh.edu")) {
                         String userId = payload.getSubject();
                         String sessionId = UUID.randomUUID().toString();
-                        // Save userId and sessionId into a local hash table (i.e. not in the database)
+                        // Save userId and sessionId into a local hash table (i.e., not in the database)
                         userSessions.put(sessionId, userId);
                         response.status(200);
                         return gson.toJson(new StructuredResponse("ok", "Authenticated", sessionId));
@@ -307,7 +334,9 @@ public class App {
                 return gson.toJson(new StructuredResponse("error", "Internal server error", null));
             }
         });
-        
+
+
+       
         
         //This route allows you to update the user profile 
         Spark.post("/api/updateprofile", (req, res) -> {
