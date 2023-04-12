@@ -121,7 +121,7 @@ public class App {
     public static void main(String[] args) {
 
         // Replace "YOUR_CLIENT_ID" with your actual Google client ID
-        String clientId = "http://cse216-teamtoo-app.dokku.cse.lehigh.edu";
+        String clientId = "1095439428573-ld3aj1sang6a4380808vbkiif2gn36cb.apps.googleusercontent.com";
         JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), jsonFactory)
         .setAudience(Collections.singletonList(clientId))
@@ -336,8 +336,38 @@ public class App {
         });
 
 
-       
+        //This handles adding comments to an idea
+        Spark.post("/ideas/:id/comments", (request, response) -> {
+            int ideaId = Integer.parseInt(request.params(":id"));
+            int userId = getUserIdFromSession(request); // You need to implement this method
+            String commentText = request.queryParams("commentText");
         
+            int commentId = database.addComment(userId, ideaId, commentText); //this needs to be made 
+            response.status(201);
+            return gson.toJson(new StructuredResponse("ok", "Comment added", commentId));
+        });
+       
+        //This handles editing comments 
+        Spark.put("/comments/:id", (request, response) -> {
+            int commentId = Integer.parseInt(request.params(":id"));
+            String newCommentText = request.queryParams("commentText");
+        
+            database.editComment(commentId, newCommentText);
+            response.status(200);
+            return gson.toJson(new StructuredResponse("ok", "Comment updated", null));
+        });
+        
+
+        //Retrieves the comments 
+        Spark.get("/ideas/:id/comments", (request, response) -> {
+            int ideaId = Integer.parseInt(request.params(":id"));
+            List<Comment> comments = database.getCommentsForIdea(ideaId);
+        
+            response.status(200);
+            return gson.toJson(new StructuredResponse("ok", "Comments for idea", comments));
+        });
+        
+
         //This route allows you to update the user profile 
         Spark.post("/api/updateprofile", (req, res) -> {
             // Parse the JSON request to obtain necessary information
