@@ -4,6 +4,7 @@ package edu.lehigh.cse216.anl225.backend;
 // create an HTTP GET route
 import spark.Spark;
 
+import java.util.HashMap;
 //Hashmap import
 import java.util.Map;
 
@@ -17,13 +18,16 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload;
 import java.security.GeneralSecurityException;
 import java.util.UUID;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 //This is all extra imports for the google authentication 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
+import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 
 
 
@@ -33,6 +37,8 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 public class App {
     private static final String DEFAULT_PORT_DB = "5432";
     private static final int DEFAULT_PORT_SPARK = 4567;
+    private static final String GOOGLE_CLIENT_ID = "1095439428573-ld3aj1sang6a4380808vbkiif2gn36cb.apps.googleusercontent.com";
+    private static final String GOOGLE_CLIENT_SECRET = "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";
 
     //Stores the user session that we are attempting to authenticate with google 
     final static ConcurrentHashMap<String, String> userSessions = new ConcurrentHashMap<>();
@@ -121,11 +127,11 @@ public class App {
     public static void main(String[] args) {
 
         // Replace "YOUR_CLIENT_ID" with your actual Google client ID
-        String clientId = "1095439428573-ld3aj1sang6a4380808vbkiif2gn36cb.apps.googleusercontent.com";
-        JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
-        GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), jsonFactory)
-        .setAudience(Collections.singletonList(clientId))
-        .build();
+        //String clientId = "1095439428573-ld3aj1sang6a4380808vbkiif2gn36cb.apps.googleusercontent.com";
+        // JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
+        // GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), jsonFactory)
+        // .setAudience(Collections.singletonList(clientId))
+        // .build();
 
         // Get the port on which to listen for requests
         Spark.port(getIntFromEnv("PORT", DEFAULT_PORT_SPARK));
@@ -302,72 +308,79 @@ public class App {
         //------------------------NEW STUFF-------------------------------//
         
         //Google authentication function 
-        Spark.post("/auth", (request, response) -> {
+        Spark.post("/login", (request, response) -> {
+            // Extract the authorization code from the request body
+            SimpleRequest req = gson.fromJson(request.body(), SimpleRequest.class);
+            String authorizationCode = req.mAuthCode;
+        
+            // Configure the Google API client
+            HttpTransport transport = new NetHttpTransport();
+            JsonFactory jsonFactory = new GsonFactory();
+            GoogleAuthorizationCodeTokenRequest tokenRequest = new GoogleAuthorizationCodeTokenRequest(
+                    transport,
+                    jsonFactory,
+                    GOOGLE_CLIENT_ID,
+                    GOOGLE_CLIENT_SECRET,
+                    authorizationCode,
+                    "postmessage" // The redirect URI should match the one used in the frontend
+            );
+        
+            // Exchange the authorization code for an access token and ID token
+            GoogleTokenResponse tokenResponse = tokenRequest.execute();
+            GoogleIdToken idToken = tokenResponse.parseIdToken();
+            Payload payload = idToken.getPayload();
+        
+            // Extract the user information from the payload
+            String userId = payload.getSubject();
+            String email = payload.getEmail();
+            String firstName = (String) payload.get("given_name");
+            String lastName = (String) payload.get("family_name");
+            String dateOfBirth = (String) payload.get("birthday");
+        
+            // Extracted information to create or update the user in your database
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("mKey", userId);
+            userData.put("email", email);
+            userData.put("firstName", firstName);
+            userData.put("lastName", lastName);
+            userData.put("birthday", dateOfBirth);
+        
+            response.status(200);
             response.type("application/json");
-
-            // Extract the ID token from the Authorization header
-            String authHeader = request.headers("Authorization");
-            String[] authHeaderParts = authHeader.split(" ");
-            String idTokenString = authHeaderParts[1];
-
-            try {
-                // Verify the ID token
-                GoogleIdToken idToken = verifier.verify(idTokenString);
-                if (idToken != null) {
-                    Payload payload = idToken.getPayload();
-                    String userEmail = payload.getEmail();
-                    if (userEmail != null && userEmail.endsWith("@lehigh.edu")) {
-                        String userId = payload.getSubject();
-                        String sessionId = UUID.randomUUID().toString();
-                        // Save userId and sessionId into a local hash table (i.e., not in the database)
-                        userSessions.put(sessionId, userId);
-                        response.status(200);
-                        return gson.toJson(new StructuredResponse("ok", "Authenticated", sessionId));
-                    } else {
-                        response.status(401);
-                        return gson.toJson(new StructuredResponse("error", "Authentication failed: not from lehigh.edu domain", null));
-                    }
-                } else {
-                    response.status(401);
-                    return gson.toJson(new StructuredResponse("error", "Authentication failed", null));
-                }
-            } catch (GeneralSecurityException | IOException e) {
-                response.status(500);
-                return gson.toJson(new StructuredResponse("error", "Internal server error", null));
-            }
+            return gson.toJson(new StructuredResponse("ok", null, userData));
         });
 
 
         //This handles adding comments to an idea
-        Spark.post("/ideas/:id/comments", (request, response) -> {
-            int ideaId = Integer.parseInt(request.params(":id"));
-            int userId = getUserIdFromSession(request); // You need to implement this method
-            String commentText = request.queryParams("commentText");
+        // Spark.post("/ideas/:id/comments", (request, response) -> {
+        //     int ideaId = Integer.parseInt(request.params(":id"));
+        //     int userId = getUserIdFromSession(request); // You need to implement this method
+        //     String commentText = request.queryParams("commentText");
         
-            int commentId = database.addComment(userId, ideaId, commentText); //this needs to be made 
-            response.status(201);
-            return gson.toJson(new StructuredResponse("ok", "Comment added", commentId));
-        });
+        //     int commentId = db.addComment(userId, ideaId, commentText); //this needs to be made 
+        //     response.status(201);
+        //     return gson.toJson(new StructuredResponse("ok", "Comment added", commentId));
+        // });
        
-        //This handles editing comments 
-        Spark.put("/comments/:id", (request, response) -> {
-            int commentId = Integer.parseInt(request.params(":id"));
-            String newCommentText = request.queryParams("commentText");
+        // //This handles editing comments 
+        // Spark.put("/comments/:id", (request, response) -> {
+        //     int commentId = Integer.parseInt(request.params(":id"));
+        //     String newCommentText = request.queryParams("commentText");
         
-            database.editComment(commentId, newCommentText);
-            response.status(200);
-            return gson.toJson(new StructuredResponse("ok", "Comment updated", null));
-        });
+        //     db.editComment(commentId, newCommentText);
+        //     response.status(200);
+        //     return gson.toJson(new StructuredResponse("ok", "Comment updated", null));
+        // });
         
 
-        //Retrieves the comments 
-        Spark.get("/ideas/:id/comments", (request, response) -> {
-            int ideaId = Integer.parseInt(request.params(":id"));
-            List<Comment> comments = database.getCommentsForIdea(ideaId);
+        // //Retrieves the comments 
+        // Spark.get("/ideas/:id/comments", (request, response) -> {
+        //     int ideaId = Integer.parseInt(request.params(":id"));
+        //     List<Comment> comments = database.getCommentsForIdea(ideaId);
         
-            response.status(200);
-            return gson.toJson(new StructuredResponse("ok", "Comments for idea", comments));
-        });
+        //     response.status(200);
+        //     return gson.toJson(new StructuredResponse("ok", "Comments for idea", comments));
+        // });
         
 
         //This route allows you to update the user profile 
