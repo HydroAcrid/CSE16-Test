@@ -73,6 +73,25 @@ public class Database {
     private PreparedStatement mDropUserTable;
     //---------------------------------------------------------------
 
+    //---------------------------------------------------------------
+    //New prepared statements for the upvote/downvote table
+    private PreparedStatement mInsertVote;
+    private PreparedStatement mSelectAllVotes;
+    private PreparedStatement mSelectOneVote;
+    private PreparedStatement mUpdateVote;
+    private PreparedStatement mDeleteVote;
+    private PreparedStatement mCreateVoteTable;
+    private PreparedStatement mDropVoteTable;
+    //---------------------------------------------------------------
+    //New prepared statements for the comment table
+    private PreparedStatement mInsertComment;
+    private PreparedStatement mSelectAllComments;
+    private PreparedStatement mSelectOneComment;
+    private PreparedStatement mUpdateComment;
+    private PreparedStatement mDeleteComment;
+    private PreparedStatement mCreateCommentTable;
+    private PreparedStatement mDropCommentTable;
+
     /**
      * RowData is like a struct in C: we use it to hold data, and we allow 
      * direct access to its fields.  In the context of this Database, RowData 
@@ -127,6 +146,37 @@ public class Database {
         }
     }
     //---------------------------------------------------------------
+
+    //---------------------------------------------------------------
+    // New inner class VoteData for upvote/downvote table
+    public static class VoteData {
+        //with id, email, upvote, and downvote
+        int mVoteId;
+        String mEmail;
+        int mUpvote;
+        int mDownvote;
+
+        public VoteData(int voteId, String email, int upvote, int downvote) {
+            mVoteId = voteId;
+            mEmail = email;
+            mUpvote = upvote;
+            mDownvote = downvote;
+        }
+    }
+
+    //---------------------------------------------------------------
+    // New inner class CommentData for comment table
+    public static class CommentData {
+        int mCommentId;
+        String mEmail;
+        String mComment;
+
+        public CommentData(int commentId, String email, String comment) {
+            mCommentId = commentId;
+            mEmail = email;
+            mComment = comment;
+        }
+    }
 
     /**
      * The Database constructor is private: we only create Database objects 
@@ -218,6 +268,24 @@ public class Database {
             mDeleteUser = mConnection.prepareStatement("DELETE FROM tbluser WHERE user_id = ?");
             mCreateUserTable = mConnection.prepareStatement("CREATE TABLE tbluser (user_id SERIAL PRIMARY KEY, username TEXT, email TEXT, gender_identity TEXT, sexual_orientation TEXT, note TEXT)");
             mDropUserTable = mConnection.prepareStatement("DROP TABLE tbluser");
+            //---------------------------------------------------------------
+            // New prepared statements for the vote table
+            mInsertVote = mConnection.prepareStatement("INSERT INTO tblvote (email, upvote, downvote) VALUES (?, ?, ?)");
+            mSelectAllVotes = mConnection.prepareStatement("SELECT * FROM tblvote");
+            mSelectOneVote = mConnection.prepareStatement("SELECT * FROM tblvote WHERE vote_id = ?");
+            mUpdateVote = mConnection.prepareStatement("UPDATE tblvote SET email = ?, upvote = ?, downvote = ? WHERE vote_id = ?");
+            mDeleteVote = mConnection.prepareStatement("DELETE FROM tblvote WHERE vote_id = ?");
+            mCreateVoteTable = mConnection.prepareStatement("CREATE TABLE tblvote (vote_id SERIAL PRIMARY KEY, email TEXT, upvote INTEGER, downvote INTEGER)");
+            mDropVoteTable = mConnection.prepareStatement("DROP TABLE tblvote");
+            //---------------------------------------------------------------
+            // New prepared statements for the comment table
+            mInsertComment = mConnection.prepareStatement("INSERT INTO tblcomment (email, comment) VALUES (?, ?)");
+            mSelectAllComments = mConnection.prepareStatement("SELECT * FROM tblcomment");
+            mSelectOneComment = mConnection.prepareStatement("SELECT * FROM tblcomment WHERE comment_id = ?");
+            mUpdateComment = mConnection.prepareStatement("UPDATE tblcomment SET email = ?, comment = ? WHERE comment_id = ?");
+            mDeleteComment = mConnection.prepareStatement("DELETE FROM tblcomment WHERE comment_id = ?");
+            mCreateCommentTable = mConnection.prepareStatement("CREATE TABLE tblcomment (comment_id SERIAL PRIMARY KEY, email TEXT, comment TEXT)");
+            mDropCommentTable = mConnection.prepareStatement("DROP TABLE tblcomment");
             //---------------------------------------------------------------
         } catch (SQLException e) {
             System.err.println("Error: Connection.prepareStatement() threw a SQLException");
@@ -375,6 +443,48 @@ public class Database {
         }
     }
 
+        /**
+     * Update/Add likes for a row/message in the database
+     * 
+     * @param mId The id of the row to update
+     * 
+     * @return The number of rows that were updated. -1 indicates an error.
+     */
+    int updateLikes(int mId) {
+        int res = -1;
+        try {
+            mUpdateLike.setInt(1, mId); //updating the query and setting the id for that row
+                                                       //parameterIndex is the question mark in the query, we are setting the value for that. 1 is the first question mark and 2 is second and so on. 
+            res = mUpdateLike.executeUpdate(); //executing the query, executeUpdate() is used for insert, update and delete queries
+            System.out.println("updated likes"); //debug
+        } catch (SQLException e) {
+            System.out.println("Error: Connection.prepareStatement() threw a SQLException"); //debug
+            e.printStackTrace();
+        }
+        return res; //returning the number of rows that were updated
+    }
+
+    /**
+     * Delete likes for a row/message in the database
+     * 
+     * @param mId The id of the row to update
+     * 
+     * @return The number of rows that were updated. -1 indicates an error.
+     *
+     */
+    int deleteLikes(int mId) {
+        int res = -1;
+        try {
+            mDeleteLike.setInt(1, mId); //updating the query and setting the id for that row
+            res = mDeleteLike.executeUpdate(); //executing the query, executeUpdate() is used for insert, update and delete queries
+            System.out.println("deleted likes"); //debug
+        } catch (SQLException e) {
+            System.out.println("Error: Connection.prepareStatement() threw a SQLException"); //debug
+            e.printStackTrace();
+        }
+        return res; //returning the number of rows that were updated
+    }
+
     //--------------------------------------------------------------
     // New methods for the user table
     /**
@@ -452,7 +562,7 @@ public class Database {
      * @param genderIdentity
      * @param sexualOrientation
      * @param note
-     * @return
+     * @return The number of rows that were updated
      */
     int updateUser(int userId, String userName, String email, String genderIdentity, String sexualOrientation, String note) {
         int count = 0;
@@ -473,7 +583,7 @@ public class Database {
     /**
      * Delete a user from the database
      * @param userId
-     * @return
+     * @return The number of rows that were deleted
      */
     int deleteUser(int userId) {
         int count = 0;
@@ -488,7 +598,7 @@ public class Database {
 
     /**
      * Create the user table
-     * @return
+     * @return True if the table was created, false if an error occurred
      */
     boolean createUserTable() {
         try {
@@ -502,7 +612,8 @@ public class Database {
 
     /**
      * Drop the user table
-     * @return
+     * @return True if the table was dropped, false if an error occurred
+     *
      */
     boolean dropUserTable() {
         try {
@@ -514,4 +625,265 @@ public class Database {
         }
     }
     //--------------------------------------------------------------
+
+    //--------------------------------------------------------------
+    // New methods for the upvote/downvote table
+    /**
+     * Insert a new upvote/downvote into the database
+     * @param userId
+     * @param messageId
+     * @param upvote
+     * @param downvote
+     * @return The number of rows that were inserted
+     */
+     int insertVote(String email, int upvote, int downvote) {
+        int count = 0;
+        try {
+            mInsertVote.setString(1, email);
+            mInsertVote.setInt(2, upvote);
+            mInsertVote.setInt(3, downvote);
+            count += mInsertVote.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return count;
+     }
+
+    /**
+     * Query the database for a list of all upvotes/downvotes and their IDs
+     *  
+     * @return All rows, as an ArrayList
+     * 
+     */
+    ArrayList<VoteData> selectAllVotes() {
+        ArrayList<VoteData> res = new ArrayList<VoteData>();
+        try {
+            ResultSet rs = mSelectAllVotes.executeQuery();
+            while (rs.next()) {
+                res.add(new VoteData(rs.getInt("vote_id"), rs.getString("email"), rs.getInt("upvote"), rs.getInt("downvote")));
+            }
+            rs.close();
+            return res;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Get all data for a specific upvote/downvote, by ID
+     * 
+     * @param voteId The id of the upvote/downvote being requested
+     * 
+     * @return The data for the requested upvote/downvote, or null if the ID was invalid
+     */
+    VoteData selectOneVote(int voteId) {
+        VoteData res = null;
+        try {
+            mSelectOneVote.setInt(1, voteId);
+            ResultSet rs = mSelectOneVote.executeQuery();
+            if (rs.next()) {
+                res = new VoteData(rs.getInt("vote_id"), rs.getString("email"), rs.getInt("upvote"), rs.getInt("downvote"));
+            }
+            rs.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return res;
+    }
+
+    /**
+     * Update the data for an upvote/downvote in the database
+     * @param voteId
+     * @param email
+     * @param upvote
+     * @param downvote
+     * @return The number of rows that were updated
+     */
+    int updateVote(int voteId, String email, int upvote, int downvote) {
+        int count = 0;
+        try {
+            mUpdateVote.setString(1, email);
+            mUpdateVote.setInt(2, upvote);
+            mUpdateVote.setInt(3, downvote);
+            mUpdateVote.setInt(4, voteId);
+            count += mUpdateVote.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return count;
+    }
+
+    /**
+     * Delete an upvote/downvote from the database
+     * @param voteId
+     * @return The number of rows that were deleted
+     */
+    int deleteVote(int voteId) {
+        int count = 0;
+        try {
+            mDeleteVote.setInt(1, voteId); 
+            count += mDeleteVote.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return count;
+    }
+
+    /**
+     * Create the upvote/downvote table
+     * @return True if the table was created, false if an error occurred
+     */
+    boolean createVoteTable() {
+        try {
+            mCreateVoteTable.execute();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Drop the upvote/downvote table
+     * @return True if the table was dropped, false if an error occurred
+     */
+
+    boolean dropVoteTable() {
+        try {
+            mDropVoteTable.execute();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    //--------------------------------------------------------------
+    // New methods for the comment table
+
+    /**
+     * Insert a new comment into the database
+     * @param email
+     * @param comment
+     * @return The number of rows that were inserted
+     */
+     int insertComment(String email, String comment) {
+        int count = 0;
+        try {
+            mInsertComment.setString(1, email);
+            mInsertComment.setString(2, comment);
+            count += mInsertComment.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return count;
+     }
+
+    /**
+     * Query the database for a list of all comments and their IDs
+     *  
+     * @return All rows, as an ArrayList
+     * 
+     */
+    ArrayList<CommentData> selectAllComments() {
+        ArrayList<CommentData> res = new ArrayList<CommentData>();
+        try {
+            ResultSet rs = mSelectAllComments.executeQuery();
+            while (rs.next()) {
+                res.add(new CommentData(rs.getInt("comment_id"), rs.getString("email"), rs.getString("comment")));
+            }
+            rs.close();
+            return res;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Get all data for a specific comment, by ID
+     * 
+     * @param commentId The id of the comment being requested
+     * 
+     * @return The data for the requested comment, or null if the ID was invalid
+     */
+    CommentData selectOneComment(int commentId) {
+        CommentData res = null;
+        try {
+            mSelectOneComment.setInt(1, commentId);
+            ResultSet rs = mSelectOneComment.executeQuery();
+            if (rs.next()) {
+                res = new CommentData(rs.getInt("comment_id"), rs.getString("email"), rs.getString("comment"));
+            }
+            rs.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return res;
+    }
+
+    /**
+     * Update the data for a comment in the database
+     * @param commentId
+     * @param email
+     * @param comment
+     * @return The number of rows that were updated
+     */
+    int updateComment(int commentId, String email, String comment) {
+        int count = 0;
+        try {
+            mUpdateComment.setString(1, email);
+            mUpdateComment.setString(2, comment);
+            mUpdateComment.setInt(3, commentId);
+            count += mUpdateComment.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return count;
+    }
+
+    /**
+     * Delete a comment from the database
+     * @param commentId
+     * @return The number of rows that were deleted
+     */
+    int deleteComment(int commentId) {
+        int count = 0;
+        try {
+            mDeleteComment.setInt(1, commentId); 
+            count += mDeleteComment.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return count;
+    }
+
+    /**
+     * Create the comment table
+     * @return True if the table was created, false if an error occurred
+     */
+    boolean createCommentTable() {
+        try {
+            mCreateCommentTable.execute();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Drop the comment table
+     * @return True if the table was dropped, false if an error occurred
+     */
+    boolean dropCommentTable() {
+        try {
+            mDropCommentTable.execute();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }
