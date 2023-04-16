@@ -298,7 +298,9 @@ public class App {
             }
         });
 
-
+ 
+        //------------------------NEW STUFF-------------------------------//
+        
         //Google authentication function 
         Spark.post("/auth", (request, response) -> {
             response.type("application/json");
@@ -395,6 +397,17 @@ public class App {
         });
         
         
+
+        /**
+         * BACKLOG:
+         * addComment - This function would add a comment to a particular idea.
+            getComments - This function would retrieve all the comments associated with a particular idea.
+            getUserProfile - This function would retrieve a user's profile based on their user ID.
+            editComment - This function would allow a user to edit a comment they previously made.
+            getIdeaVotes - This function would retrieve the upvotes and downvotes for a particular idea.
+            getUserVotes - This function would retrieve the votes (upvotes and downvotes) a particular user has made.
+            You may also need to modify your existing functions (likeIdea and dislikeIdea) to follow the new upvote and downvote guidelines.
+         */
 
 
 
