@@ -200,7 +200,8 @@ public class App {
             int idx = Integer.parseInt(request.params("id"));
             // ensure status 200 OK, with a MIME type of JSON
             response.type("application/json");
-            DataRow data = db.selectOne(idx);
+            //DataRow data = db.selectOne(idx);
+            DataRow data = db.convertToDataRow(db.selectOne(idx));
             if (data == null) {
                 response.status(404); // not found
                 return gson.toJson(new StructuredResponse("error", idx + " not found", null));
@@ -233,41 +234,76 @@ public class App {
         // ADD LIKES route for adding a new like to the DataStore. This will read
         // JSON from the body of the request, turn it into a SimpleRequest
         // Use the mId from the request to update the likes in the database
+        // Spark.put("/likes/:id", (request, response) -> {
+        //     SimpleRequest req = gson.fromJson(request.body(), SimpleRequest.class); // should look something like this: {"mId":1}
+        //     response.type("application/json");
+        //     int likeResult = db.updateLikes(req.mId); // update likes and should return 1 because it updated 1 row
+        //     DataRow data = db.selectOne(req.mId); // SOMETHING IS WRONG HERE
+        //     int numLikes = data.mLikes; // get the number of likes from the row, defined in DataRow.java
+        //     if (likeResult == -1) { 
+        //         response.status(500); // internal server errorl
+        //         return gson.toJson(new StructuredResponse("error", "error performing insertion, mId doesn't exist", null)); // error
+        //     } else {
+        //         response.status(200); 
+        //         return gson.toJson(new StructuredResponse("ok, added likes", "Liked Message", null)); // success should look like this: {"mStatus":"ok","mMessage":"1"}
+        //     }
+        // });
+
+
         Spark.put("/likes/:id", (request, response) -> {
-            SimpleRequest req = gson.fromJson(request.body(), SimpleRequest.class); // should look something like this: {"mId":1}
+            SimpleRequest req = gson.fromJson(request.body(), SimpleRequest.class);
             response.type("application/json");
-            int likeResult = db.updateLikes(req.mId); // update likes and should return 1 because it updated 1 row
-            DataRow data = db.selectOne(req.mId); // SOMETHING IS WRONG HERE
-            int numLikes = data.mLikes; // get the number of likes from the row, defined in DataRow.java
-            if (likeResult == -1) { 
-                response.status(500); // internal server errorl
-                return gson.toJson(new StructuredResponse("error", "error performing insertion, mId doesn't exist", null)); // error
+            int likeResult = db.updateLikes(req.mId);
+        
+            if (likeResult == -1) {
+                response.status(500);
+                return gson.toJson(new StructuredResponse("error", "error performing insertion, mId doesn't exist", null));
             } else {
-                response.status(200); 
-                return gson.toJson(new StructuredResponse("ok, added likes", "Liked Message", null)); // success should look like this: {"mStatus":"ok","mMessage":"1"}
+                DataRow data = db.convertToDataRow(db.selectOne(req.mId));
+                int numLikes = data.mLikes;
+                response.status(200);
+                return gson.toJson(new StructuredResponse("ok", "Liked Message. Total likes: " + numLikes, data));
             }
         });
-
+        
 
         // UNLIKE route for unliking from the DataStore. This will read
         // JSON from the body of the request, turn it into a SimpleRequest
         // Use the mId from the request to update the likes in the database
+        // Spark.put("/dislikes/:id", (request, response) -> {
+        //     // NB: if gson.Json fails, Spark will reply with status 500 Internal
+        //     // Server Error
+        //     SimpleRequest req = gson.fromJson(request.body(), SimpleRequest.class);
+        //     response.type("application/json"); 
+        //     int dislikeResult = db.deleteLikes(req.mId); // update likes and should return 1 because it updated 1 row
+        //     //DataRow data = db.selectOne(req.mId); 
+        //     DataRow data = db.convertToDataRow(db.selectOne(req.mId)); //THIS MIGHT BE WRONG 
+        //     int numLikes = data.mLikes;
+        //     if (dislikeResult == -1) {
+        //         response.status(500); // internal server error
+        //         return gson.toJson(new StructuredResponse("error", "error performing insertion, mId doesn't exist", null));
+        //     } else {
+        //         response.status(200);
+        //         return gson.toJson(new StructuredResponse("ok, removed likes", "Unliked Message", null));
+        //     }
+        // });
+
         Spark.put("/dislikes/:id", (request, response) -> {
-            // NB: if gson.Json fails, Spark will reply with status 500 Internal
-            // Server Error
             SimpleRequest req = gson.fromJson(request.body(), SimpleRequest.class);
-            response.type("application/json"); 
-            int dislikeResult = db.deleteLikes(req.mId); // update likes and should return 1 because it updated 1 row
-            DataRow data = db.selectOne(req.mId); 
-            int numLikes = data.mLikes;
+            response.type("application/json");
+            int dislikeResult = db.deleteLikes(req.mId);
+        
             if (dislikeResult == -1) {
-                response.status(500); // internal server error
+                response.status(500);
                 return gson.toJson(new StructuredResponse("error", "error performing insertion, mId doesn't exist", null));
             } else {
+                DataRow data = db.convertToDataRow(db.selectOne(req.mId));
+                int numLikes = data.mLikes;
                 response.status(200);
-                return gson.toJson(new StructuredResponse("ok, removed likes", "Unliked Message", null));
+                return gson.toJson(new StructuredResponse("ok", "Unliked Message. Total likes: " + numLikes, data));
             }
         });
+        
 
         // PUT route for updating a row in the DataStore. This is almost
         // exactly the same as POST
