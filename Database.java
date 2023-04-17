@@ -11,6 +11,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 
 public class Database {
+    
     /**
      * The connection to the database.  When there is no connection, it should
      * be null.  Otherwise, there is a valid open connection
@@ -117,12 +118,18 @@ public class Database {
         String mMessage;
 
         /**
+         * The likes stored in the row
+         */
+        int mLikes;
+
+        /**
          * Construct a RowData object by providing values for its fields
          */
         public RowData(int id, String subject, String message) {
             mId = id;
             mSubject = subject;
             mMessage = message;
+    
         }
     }
 
@@ -178,6 +185,10 @@ public class Database {
         }
     }
 
+    public DataRow convertToDataRow(RowData rowData) {
+        return new DataRow(rowData.mId, rowData.mSubject, rowData.mMessage, rowData.mLikes);
+    }
+
     /**
      * The Database constructor is private: we only create Database objects 
      * through the getDatabase() method.
@@ -186,6 +197,8 @@ public class Database {
         
     }
 
+   
+    
     /**
      * Get a fully-configured connection to the database
      * 
@@ -368,19 +381,21 @@ public class Database {
      * 
      * @return The data for the requested row, or null if the ID was invalid
      */
-    RowData selectOne(int id) {
-        RowData res = null;
+    DataRow selectOne(int id) {
+        DataRow res = null;
         try {
             mSelectOne.setInt(1, id);
             ResultSet rs = mSelectOne.executeQuery();
-            if (rs.next()) {
-                res = new RowData(rs.getInt("id"), rs.getString("subject"), rs.getString("message"));
+            if (rs.next()) { 
+                res = new DataRow(rs.getInt("id"), rs.getString("subject"), rs.getString("message"), rs.getInt("likes"));
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return res;
     }
+
+   
 
     /**
      * Delete a row by ID
@@ -886,4 +901,6 @@ public class Database {
             return false;
         }
     }
+
+    
 }
