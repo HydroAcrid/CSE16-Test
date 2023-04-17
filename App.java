@@ -4,6 +4,7 @@ package edu.lehigh.cse216.anl225.backend;
 // create an HTTP GET route
 import spark.Spark;
 
+import java.util.Collections;
 import java.util.HashMap;
 //Hashmap import
 import java.util.Map;
@@ -351,40 +352,137 @@ public class App {
             return gson.toJson(new StructuredResponse("ok", null, userData));
         });
 
+        // Google authentication function
+        Spark.post("/login", (request, response) -> {
+            // Extract the authorization code from the request body
+            SimpleRequest req = gson.fromJson(request.body(), SimpleRequest.class);
+            String authorizationCode = req.mAuthCode;
+        
+            // Configure the Google API client
+            HttpTransport transport = new NetHttpTransport();
+            JsonFactory jsonFactory = new GsonFactory();
+            GoogleAuthorizationCodeTokenRequest tokenRequest = new GoogleAuthorizationCodeTokenRequest(
+                    transport,
+                    jsonFactory,
+                    GOOGLE_CLIENT_ID,
+                    GOOGLE_CLIENT_SECRET,
+                    authorizationCode,
+                    "postmessage" // The redirect URI should match the one used in the frontend
+            );
+        
+            // Exchange the authorization code for an access token and ID token
+            GoogleTokenResponse tokenResponse = tokenRequest.execute();
+            GoogleIdToken idToken = tokenResponse.parseIdToken();
+            Payload payload = idToken.getPayload();
+        
+            // Extract the user information from the payload
+            String userId = payload.getSubject();
+            String email = payload.getEmail();
+            String firstName = (String) payload.get("given_name");
+            String lastName = (String) payload.get("family_name");
+            String dateOfBirth = (String) payload.get("birthday");
+
+            // Extract the ID token string
+            String idTokenString = idToken.toString();
+
+            // Extracted information to create or update the user in your database
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("mKey", userId);
+            userData.put("email", email);
+            userData.put("firstName", firstName);
+            userData.put("lastName", lastName);
+            userData.put("birthday", dateOfBirth);
+            userData.put("idToken", idTokenString);
+
+            response.status(200);
+            response.type("application/json");
+            return gson.toJson(new StructuredResponse("ok", null, userData));
+        });
+
 
         //This handles adding comments to an idea
-        // Spark.post("/ideas/:id/comments", (request, response) -> {
-        //     int ideaId = Integer.parseInt(request.params(":id"));
-        //     int userId = getUserIdFromSession(request); // You need to implement this method
-        //     String commentText = request.queryParams("commentText");
+        Spark.post("/ideas/:id/comments", (request, response) -> {
+            int ideaId = Integer.parseInt(request.params(":id"));
+            int userId = getUserIdFromSession(request); // You need to implement this method
+            String commentText = request.queryParams("commentText");
         
-        //     int commentId = db.addComment(userId, ideaId, commentText); //this needs to be made 
-        //     response.status(201);
-        //     return gson.toJson(new StructuredResponse("ok", "Comment added", commentId));
-        // });
+            int commentId = db.addComment(userId, ideaId, commentText); //this needs to be made 
+            response.status(201);
+            return gson.toJson(new StructuredResponse("ok", "Comment added", commentId));
+        });
        
-        // //This handles editing comments 
-        // Spark.put("/comments/:id", (request, response) -> {
-        //     int commentId = Integer.parseInt(request.params(":id"));
-        //     String newCommentText = request.queryParams("commentText");
+        //This handles editing comments 
+        Spark.put("/comments/:id", (request, response) -> {
+            int commentId = Integer.parseInt(request.params(":id"));
+            String newCommentText = request.queryParams("commentText");
         
-        //     db.editComment(commentId, newCommentText);
-        //     response.status(200);
-        //     return gson.toJson(new StructuredResponse("ok", "Comment updated", null));
-        // });
-        
-
-        // //Retrieves the comments 
-        // Spark.get("/ideas/:id/comments", (request, response) -> {
-        //     int ideaId = Integer.parseInt(request.params(":id"));
-        //     List<Comment> comments = database.getCommentsForIdea(ideaId);
-        
-        //     response.status(200);
-        //     return gson.toJson(new StructuredResponse("ok", "Comments for idea", comments));
-        // });
+            db.editComment(commentId, newCommentText);
+            response.status(200);
+            return gson.toJson(new StructuredResponse("ok", "Comment updated", null));
+        });
         
 
-        //This route allows you to update the user profile 
+        //Retrieves the comments 
+        Spark.get("/ideas/:id/comments", (request, response) -> {
+            int ideaId = Integer.parseInt(request.params(":id"));
+            List<Comment> comments = database.getCommentsForIdea(ideaId);
+        
+            response.status(200);
+            return gson.toJson(new StructuredResponse("ok", "Comments for idea", comments));
+        });
+        
+
+        //Allows the user to create a profile 
+        Spark.post("/api/createprofile", (req, res) -> {
+            // Parse the JSON request to obtain necessary information
+            SimpleUserRequest userRequest = gson.fromJson(req.body(), SimpleUserRequest.class);
+            String userName = userRequest.mUserName;
+            String email = userRequest.mEmail;
+            String genderIdentity = userRequest.mGI;
+            String sexualOrientation = userRequest.mSO;
+            String idTokenString = userRequest.mNote; //the google string 
+        
+            // Verify the ID token
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(GOOGLE_CLIENT_ID))
+                    .build();
+            GoogleIdToken idToken = verifier.verify(idTokenString);
+            JsonObject response = new JsonObject();
+        
+            if (idToken != null) {
+                // Get the user data from the idToken
+                Payload payload = idToken.getPayload();
+                String googleUserId = payload.getSubject();
+                String googleEmail = payload.getEmail();
+        
+                // Check if the email from the idToken matches the provided email
+                if (email.equals(googleEmail)) {
+                    // Call the insertUser method to create a new user in the database
+                    int userId = db.insertUser(googleUserId, email, genderIdentity, sexualOrientation, idTokenString);
+        
+                    // Prepare the JSON response
+                    if (userId > 0) {
+                        response.addProperty("success", true);
+                        response.addProperty("userId", userId);
+                    } else {
+                        response.addProperty("success", false);
+                        response.addProperty("error", "Failed to create profile");
+                    }
+                } else {
+                    response.addProperty("success", false);
+                    response.addProperty("error", "Invalid user data");
+                }
+            } else {
+                response.addProperty("success", false);
+                response.addProperty("error", "Invalid ID token");
+            }
+        
+            res.type("application/json");
+            return gson.toJson(response);
+        });
+
+        
+        //Allows the user to edit their profile 
         Spark.post("/api/updateprofile", (req, res) -> {
             // Parse the JSON request to obtain necessary information
             SimpleUserRequest userRequest = gson.fromJson(req.body(), SimpleUserRequest.class);
@@ -393,22 +491,47 @@ public class App {
             String email = userRequest.mEmail;
             String genderIdentity = userRequest.mGI;
             String sexualOrientation = userRequest.mSO;
-            String note = userRequest.mNote;
+            String idTokenString = userRequest.mNote; //the google string 
         
-            // Call the updateUser method to update the user's information in the database
-            int count = db.updateUser(userId, userName, email, genderIdentity, sexualOrientation, note);
-        
-            // Prepare the JSON response
+            // Verify the ID token
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(GOOGLE_CLIENT_ID))
+                    .build();
+            GoogleIdToken idToken = verifier.verify(idTokenString);
             JsonObject response = new JsonObject();
-            if (count > 0) {
-                response.addProperty("success", true);
+        
+            if (idToken != null) {
+                // Get the user data from the idToken
+                Payload payload = idToken.getPayload();
+                String googleUserId = payload.getSubject();
+                String googleEmail = payload.getEmail();
+        
+                // Check if the user data from the idToken matches the provided user data
+                if (userId == Integer.parseInt(googleUserId) && email.equals(googleEmail)) {
+                    // Call the updateUser method to update the user's information in the database
+                    int count = db.updateUser(userId, userName, email, genderIdentity, sexualOrientation, idTokenString);
+        
+                    // Prepare the JSON response
+                    if (count > 0) {
+                        response.addProperty("success", true);
+                    } else {
+                        response.addProperty("success", false);
+                        response.addProperty("error", "Update failed");
+                    }
+                } else {
+                    response.addProperty("success", false);
+                    response.addProperty("error", "Invalid user data");
+                }
             } else {
                 response.addProperty("success", false);
-                response.addProperty("error", "Update failed");
+                response.addProperty("error", "Invalid ID token");
             }
+        
             res.type("application/json");
             return gson.toJson(response);
         });
+        
+
         
         
 
