@@ -12,6 +12,8 @@ import java.util.Map;
 // Import Google's JSON library
 import com.google.gson.*;
 
+import edu.lehigh.cse216.anl225.backend.Database.CommentData;
+
 //concurrent hashmap import 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -396,41 +398,61 @@ public class App {
 
             response.status(200);
             response.type("application/json");
-            return gson.toJson(new StructuredResponse("ok", null, userData));
+            return gson.toJson(new StructuredResponse("ok", null, userData)); //use this as the session key 
         });
 
 
-        //This handles adding comments to an idea
-        Spark.post("/ideas/:id/comments", (request, response) -> {
-            int ideaId = Integer.parseInt(request.params(":id"));
-            int userId = getUserIdFromSession(request); // You need to implement this method
-            String commentText = request.queryParams("commentText");
-        
-            int commentId = db.addComment(userId, ideaId, commentText); //this needs to be made 
-            response.status(201);
-            return gson.toJson(new StructuredResponse("ok", "Comment added", commentId));
-        });
-       
-        //This handles editing comments 
-        Spark.put("/comments/:id", (request, response) -> {
-            int commentId = Integer.parseInt(request.params(":id"));
-            String newCommentText = request.queryParams("commentText");
-        
-            db.editComment(commentId, newCommentText);
+        //GET route that retrieves all comments
+        Spark.get("/comments", (request, response) -> {
+            // ensure status 200 OK, with a MIME type of JSON
             response.status(200);
-            return gson.toJson(new StructuredResponse("ok", "Comment updated", null));
+            response.type("application/json");
+            return gson.toJson(new StructuredResponse("ok", null, db.selectAllComments()));
         });
-        
 
-        //Retrieves the comments 
+        // Retrieves a specific comment based on the idea's id. 
         Spark.get("/ideas/:id/comments", (request, response) -> {
             int ideaId = Integer.parseInt(request.params(":id"));
-            List<Comment> comments = database.getCommentsForIdea(ideaId);
-        
-            response.status(200);
-            return gson.toJson(new StructuredResponse("ok", "Comments for idea", comments));
+            response.type("application/json");
+            CommentData comment = db.selectOneComment(ideaId);
+            if (comment == null) {
+                response.status(404); // not found
+                return gson.toJson(new StructuredResponse("error", ideaId + " not found", null));
+            } else {
+                response.status(200);
+                return gson.toJson(new StructuredResponse("ok", ""+comment.mComment, null));
+            }
         });
-        
+
+        // This handles adding comments to an idea
+        Spark.post("/ideas/:id/comments", (request, response) -> {
+            SimpleCommentRequest req = gson.fromJson(request.body(), SimpleCommentRequest.class);
+            response.type("application/json");
+
+            // NB: createEntry checks for null title and message
+            int newId = db.insertComment(req.mEmail, req.mComment);
+            if (newId == -1) {
+                response.status(500); // internal server error
+                return gson.toJson(new StructuredResponse("error", "error performing insertion", null));
+            } else {
+                response.status(200);
+                return gson.toJson(new StructuredResponse("ok", "" + newId, null));
+            }
+
+        });
+
+
+        // --------THIS EDIT FUNCTION IS BACKLOG LEAVE IT FOR LATER-----------
+        // This handles editing comments  
+        // Spark.put("/comments/:id", (request, response) -> {
+        //     int commentId = Integer.parseInt(request.params(":id"));
+        //     String newCommentText = request.queryParams("commentText");
+
+        //     db.updateComment(commentId, newCommentText);
+        //     response.status(200);
+        //     return gson.toJson(new StructuredResponse("ok", "Comment updated", null));
+        // });
+
 
         //Allows the user to create a profile 
         Spark.post("/api/createprofile", (req, res) -> {
