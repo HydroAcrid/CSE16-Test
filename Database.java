@@ -62,6 +62,11 @@ public class Database {
      */
     private PreparedStatement mDropTable;
 
+    /**
+     * A prepared statement for invalidating a message.  
+     */
+    private PreparedStatement mInvalidMessage; 
+
     //---------------------------------------------------------------
     // New prepared statements for the user table
     private PreparedStatement mInsertUser;
@@ -91,6 +96,7 @@ public class Database {
     private PreparedStatement mDeleteComment;
     private PreparedStatement mCreateCommentTable;
     private PreparedStatement mDropCommentTable;
+    private PreparedStatement mInvalidComment;
 
     /**
      * RowData is like a struct in C: we use it to hold data, and we allow 
@@ -257,7 +263,7 @@ public class Database {
             mUpdateOne = mConnection.prepareStatement("UPDATE tbldata SET message = ? WHERE id = ?");
             mUpdateLike = mConnection.prepareStatement("UPDATE tbldata SET likes = likes + 1 WHERE id = ?");
             mDeleteLike = mConnection.prepareStatement("UPDATE tbldata SET likes = likes - 1 WHERE id = ?");
-            mCreateTable = mConnection.prepareStatement("CREATE TABLE tbldata (id SERIAL PRIMARY KEY, subject TEXT, message TEXT, likes INTEGER DEFAULT 0)");
+            mCreateTable = mConnection.prepareStatement("CREATE TABLE tbldata (id SERIAL PRIMARY KEY, subject TEXT, message TEXT, likes INTEGER DEFAULT 0, isValid BOOLEAN DEFAULT true)");
             mDropTable = mConnection.prepareStatement("DROP TABLE tbldata");
             //---------------------------------------------------------------
             // New prepared statements for the user table
@@ -284,7 +290,7 @@ public class Database {
             mSelectOneComment = mConnection.prepareStatement("SELECT * FROM tblcomment WHERE comment_id = ?");
             mUpdateComment = mConnection.prepareStatement("UPDATE tblcomment SET email = ?, comment = ? WHERE comment_id = ?");
             mDeleteComment = mConnection.prepareStatement("DELETE FROM tblcomment WHERE comment_id = ?");
-            mCreateCommentTable = mConnection.prepareStatement("CREATE TABLE tblcomment (comment_id SERIAL PRIMARY KEY, email TEXT, comment TEXT)");
+            mCreateCommentTable = mConnection.prepareStatement("CREATE TABLE tblcomment (comment_id SERIAL PRIMARY KEY, email TEXT, comment TEXT, isValid BOOLEAN DEFAULT true)");
             mDropCommentTable = mConnection.prepareStatement("DROP TABLE tblcomment");
             //---------------------------------------------------------------
         } catch (SQLException e) {
