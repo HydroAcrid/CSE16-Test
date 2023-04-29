@@ -263,7 +263,8 @@ public class Database {
             mUpdateOne = mConnection.prepareStatement("UPDATE tbldata SET message = ? WHERE id = ?");
             mUpdateLike = mConnection.prepareStatement("UPDATE tbldata SET likes = likes + 1 WHERE id = ?");
             mDeleteLike = mConnection.prepareStatement("UPDATE tbldata SET likes = likes - 1 WHERE id = ?");
-            mCreateTable = mConnection.prepareStatement("CREATE TABLE tbldata (id SERIAL PRIMARY KEY, subject TEXT, message TEXT, likes INTEGER DEFAULT 0, isValid BOOLEAN DEFAULT true)");
+            mInvalidMessage = mConnection.prepareStatement("UPDATE tbldata SET isValid = isValid - 1 WHERE id = ?"); //NEW LINE HERE ------  
+            mCreateTable = mConnection.prepareStatement("CREATE TABLE tbldata (id SERIAL PRIMARY KEY, subject TEXT, message TEXT, likes INTEGER DEFAULT 0, isValid INTEGER DEFAULT 1)");
             mDropTable = mConnection.prepareStatement("DROP TABLE tbldata");
             //---------------------------------------------------------------
             // New prepared statements for the user table
@@ -290,7 +291,8 @@ public class Database {
             mSelectOneComment = mConnection.prepareStatement("SELECT * FROM tblcomment WHERE comment_id = ?");
             mUpdateComment = mConnection.prepareStatement("UPDATE tblcomment SET email = ?, comment = ? WHERE comment_id = ?");
             mDeleteComment = mConnection.prepareStatement("DELETE FROM tblcomment WHERE comment_id = ?");
-            mCreateCommentTable = mConnection.prepareStatement("CREATE TABLE tblcomment (comment_id SERIAL PRIMARY KEY, email TEXT, comment TEXT, isValid BOOLEAN DEFAULT true)");
+            mInvalidComment = mConnection.prepareStatement("UPDATE tblcomment SET isValid = isValid - 1 WHERE id = ?"); //NEW LINE HERE ------ 
+            mCreateCommentTable = mConnection.prepareStatement("CREATE TABLE tblcomment (comment_id SERIAL PRIMARY KEY, email TEXT, comment TEXT, isValid INTEGER DEFAULT 1)");
             mDropCommentTable = mConnection.prepareStatement("DROP TABLE tblcomment");
             //---------------------------------------------------------------
         } catch (SQLException e) {
@@ -490,6 +492,29 @@ public class Database {
         }
         return res; //returning the number of rows that were updated
     }
+
+    /**
+     * Makes a message invalid by changing "isValid" value from 1 to 0
+     * 
+     * @param mId The id of the row to update
+     * 
+     * @return The number of rows that were updated. -1 indicates an error.
+     *
+     */
+    int invalidateMessage(int mId) {
+        int res = -1;
+        try {
+            mInvalidMessage.setInt(1,mId);
+            res = mInvalidMessage.executeUpdate();
+            System.out.println("Made message Invalid");
+        } catch(SQLException e) {
+            System.out.println("Error: Connect.prepareStatement() threw an SQLException");
+            e.printStackTrace();
+        }
+        return res;
+    }
+
+    
 
     //--------------------------------------------------------------
     // New methods for the user table
@@ -863,6 +888,27 @@ public class Database {
             e.printStackTrace();
         }
         return count;
+    }
+
+    /**
+     * Makes a comment invalid by changing "isValid" value from 1 to 0
+     * 
+     * @param mId The id of the row to update
+     * 
+     * @return The number of rows that were updated. -1 indicates an error.
+     *
+     */
+    int invalidateComment(int mId) {
+        int res = -1;
+        try {
+            mInvalidComment.setInt(1,mId);
+            res = mInvalidComment.executeUpdate();
+            System.out.println("Made comment Invalid");
+        } catch(SQLException e) {
+            System.out.println("Error: Connect.prepareStatement() threw an SQLException");
+            e.printStackTrace();
+        }
+        return res;
     }
 
     /**
