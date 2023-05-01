@@ -67,6 +67,8 @@ public class Database {
      */
     private PreparedStatement mInvalidMessage; 
 
+    private PreparedStatement mSelectInvalid;
+
     //---------------------------------------------------------------
     // New prepared statements for the user table
     private PreparedStatement mInsertUser;
@@ -97,6 +99,7 @@ public class Database {
     private PreparedStatement mCreateCommentTable;
     private PreparedStatement mDropCommentTable;
     private PreparedStatement mInvalidComment;
+    private PreparedStatement mSelectInvalidComment;
 
     /**
      * RowData is like a struct in C: we use it to hold data, and we allow 
@@ -131,6 +134,8 @@ public class Database {
             mMessage = message;
         }
     }
+
+    
 
     //---------------------------------------------------------------
     // New inner class UserData for user table
@@ -257,6 +262,7 @@ public class Database {
     private Database createPreparedStatements() { // add the table name to the queries
         try {
             mSelectAll = mConnection.prepareStatement("SELECT * FROM tbldata");
+            mSelectInvalid = mConnection.prepareStatement("SELECT * FROM tbldata WHERE isValid = 0");
             mSelectOne = mConnection.prepareStatement("SELECT * FROM tbldata WHERE id = ?");
             mDeleteOne = mConnection.prepareStatement("DELETE FROM tbldata WHERE id = ?");
             mInsertOne = mConnection.prepareStatement("INSERT INTO tbldata (subject, message) VALUES (?, ?)");
@@ -288,6 +294,7 @@ public class Database {
             // New prepared statements for the comment table
             mInsertComment = mConnection.prepareStatement("INSERT INTO tblcomment (email, comment) VALUES (?, ?)");
             mSelectAllComments = mConnection.prepareStatement("SELECT * FROM tblcomment");
+            mSelectInvalidComment = mConnection.prepareStatement("SELECT * FROM tblcomment WHERE isValid = 0");
             mSelectOneComment = mConnection.prepareStatement("SELECT * FROM tblcomment WHERE comment_id = ?");
             mUpdateComment = mConnection.prepareStatement("UPDATE tblcomment SET email = ?, comment = ? WHERE comment_id = ?");
             mDeleteComment = mConnection.prepareStatement("DELETE FROM tblcomment WHERE comment_id = ?");
@@ -358,6 +365,26 @@ public class Database {
         ArrayList<RowData> res = new ArrayList<RowData>();
         try {
             ResultSet rs = mSelectAll.executeQuery();
+            while (rs.next()) {
+                res.add(new RowData(rs.getInt("id"), rs.getString("subject"), null));
+            }
+            rs.close();
+            return res;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Query the database for a list of all rows with an isValid value of 0
+     * 
+     * @return all invalid rows, as an ArrayList
+     */
+    ArrayList<RowData> selectAllInvalid() {
+        ArrayList<RowData> res = new ArrayList<RowData>();
+        try {
+            ResultSet rs = mSelectInvalid.executeQuery();
             while (rs.next()) {
                 res.add(new RowData(rs.getInt("id"), rs.getString("subject"), null));
             }
@@ -513,6 +540,8 @@ public class Database {
         }
         return res;
     }
+
+    
 
     
 
@@ -833,6 +862,26 @@ public class Database {
     }
 
     /**
+     * Query the database for a list of all rows with an isValid value of 0
+     * 
+     * @return all invalid rows, as an ArrayList
+     */
+    ArrayList<CommentData> selectAllInvalidComments() {
+        ArrayList<CommentData> res = new ArrayList<CommentData>();
+        try {
+            ResultSet rs = mSelectInvalidComment.executeQuery();
+            while (rs.next()) {
+                res.add(new CommentData(rs.getInt("comment_id"), rs.getString("email"), rs.getString("comment")));
+            }
+            rs.close();
+            return res;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
      * Get all data for a specific comment, by ID
      * 
      * @param commentId The id of the comment being requested
@@ -910,6 +959,7 @@ public class Database {
         }
         return res;
     }
+
 
     /**
      * Create the comment table
