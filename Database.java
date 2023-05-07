@@ -7,6 +7,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.sql.Timestamp;
+
 
 import java.util.ArrayList;
 
@@ -988,4 +990,87 @@ public class Database {
             return false;
         }
     }
+
+
+    //---------NOTE: THIS STUFF MIGHT NOT WORK. BUT I HAD TO TRY TO DO THEM TO FUFILL MY REQUIREMENTS. I CANT FULLY FINISH THIS INTO BACKEND DOES IT SO DONT USE THESE FOR NOW  --------
+
+    // Alter the table structure for new deployment without disrupting the current deployment
+    public void alterTable(String tableName, String columnName, String columnType) throws SQLException {
+        createTable();
+        String query = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnType;
+        mCreateTable.executeUpdate(query);
+        mCreateTable.close();
+    }
+
+    // Prepopulate the table with test data
+    public void prepopulateTable() throws SQLException {
+        // Insert test data into the message table
+        insertRow("Test Document 1", "This is test document 1.");
+        insertRow("Test Document 2", "This is test document 2.");
+        insertRow("Test Document 3", "This is test document 3.");
+
+        //Insert test data into the comment table 
+        insertComment("rty267@lehigh.edu", "This is test comment 1.");
+        insertComment("sub267@lehigh.edu", "This is test comment 2.");
+        insertComment("uio267@lehigh.edu", "This is test comment 3.");
+
+
+        //Insert test data into the user table
+        insertUser("Stacy", "stu256@lehigh,edu", "H", "F", "?");
+        insertUser("Brady", "brt256@lehigh,edu", "N", "M", "?");
+        insertUser("Louis", "lsu256@lehigh,edu", "A", "O", "?");
+
+
+        //Insert test data into the voting table 
+        insertVote("stu256@lehigh.edu", 3, 5);
+        insertVote("rtg256@lehigh.edu", 26, 83);
+        insertVote("bjk256@lehigh.edu", 1, 300);
+
+    }
+
+    // Remove the least recently accessed uploaded content
+    public void removeLeastRecentlyAccessed() throws SQLException {
+        createTable();
+        String query = "DELETE FROM tbldata WHERE last_accessed = (SELECT MIN(last_accessed) FROM tbldata)";
+        mCreateTable.executeUpdate(query);
+        mCreateTable.close();
+      
+    }
+
+    // List documents, their original owners, and the most recent activity on those documents
+    public ArrayList<DocumentData> listDocuments() throws SQLException {
+        ArrayList<DocumentData> documents = new ArrayList<>();
+        createTable();
+        String query = "SELECT id, owner, title, last_accessed FROM tablename";
+        ResultSet rs = mCreateTable.executeQuery(query);
+
+        while (rs.next()) {
+            int id = rs.getInt("id");
+            String owner = rs.getString("owner");
+            String title = rs.getString("title");
+            Timestamp lastAccessed = rs.getTimestamp("last_accessed");
+            documents.add(new DocumentData(id, owner, title, lastAccessed));
+        }
+
+        rs.close();
+        mCreateTable.close();
+
+        return documents;
+    }
+
+    // DocumentData class for holding document information
+    public static class DocumentData {
+        public int mId;
+        public String mOwner;
+        public String mTitle;
+        public Timestamp mLastAccessed;
+
+        public DocumentData(int id, String owner, String title, Timestamp lastAccessed) {
+            mId = id;
+            mOwner = owner;
+            mTitle = title;
+            mLastAccessed = lastAccessed;
+        }
+    }
+
 }
